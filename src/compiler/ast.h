@@ -32,8 +32,10 @@ struct Identifier : ASTNode {
 struct FunctionDecl : ASTNode {
     std::shared_ptr<Identifier> name;
     std::vector<std::shared_ptr<Identifier>> params;
+    std::vector<std::shared_ptr<Identifier>> context; // ambient lambdas
     std::shared_ptr<ASTNode> body;
 };
+
 
 // function call
 struct Call : ASTNode {
@@ -44,6 +46,11 @@ struct Call : ASTNode {
 // pipeline node
 struct Pipeline : ASTNode {
     std::vector<std::shared_ptr<ASTNode>> stages;
+};
+
+struct EffectBlock : ASTNode {
+    bool isEffect; // true if do!
+    std::vector<std::shared_ptr<ASTNode>> statements;
 };
 
 } // namespace lambdawg
