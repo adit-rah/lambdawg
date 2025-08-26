@@ -1,24 +1,25 @@
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace lambdawg {
-    
+
 // base AST node
 struct ASTNode {
     virtual ~ASTNode() = default;
+    bool isPure = true;            // true if node has no effects
+    std::string type = "Unknown";  // basic type inference: Int, String, Bool
 };
 
 // literal node
 struct Literal : ASTNode {
-    enum class Type {
-        Int,
-        String,
-        Bool
-    } type;
-    
+    enum class Type { Int, String, Bool } type;
+
     std::string value;
+    std::string semType;
+    llvm::Value *llvmValue = nullptr;  // LLVM value generated during codegen
+
     Literal(Type t, const std::string &v) : type(t), value(v) {}
 };
 
@@ -32,10 +33,9 @@ struct Identifier : ASTNode {
 struct FunctionDecl : ASTNode {
     std::shared_ptr<Identifier> name;
     std::vector<std::shared_ptr<Identifier>> params;
-    std::vector<std::shared_ptr<Identifier>> context; // ambient lambdas
+    std::vector<std::shared_ptr<Identifier>> context;  // ambient lambdas
     std::shared_ptr<ASTNode> body;
 };
-
 
 // function call
 struct Call : ASTNode {
@@ -49,8 +49,8 @@ struct Pipeline : ASTNode {
 };
 
 struct EffectBlock : ASTNode {
-    bool isEffect; // true if do!
+    bool isEffect;  // true if do!
     std::vector<std::shared_ptr<ASTNode>> statements;
 };
 
-} // namespace lambdawg
+}  // namespace lambdawg
