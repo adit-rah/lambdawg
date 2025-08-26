@@ -15,11 +15,12 @@ class Parser {
    private:
     Lexer& lexer;
     Token current;
+
     void advance();
+
     std::shared_ptr<ASTNode> parseExpression();
     std::shared_ptr<FunctionDecl> parseFunction();
-    std::shared_ptr<ASTNode> Parser::parseEffectBlock();
-    std::shared_ptr<ASTNode> Parser::parsePipeline();
+    std::shared_ptr<ASTNode> parseEffectBlock();
     std::shared_ptr<Call> parseCall();
 };
 

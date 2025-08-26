@@ -3,12 +3,15 @@
 #include <string>
 #include <vector>
 
+#include "llvm/IR/Value.h"
+
 namespace lambdawg {
 
 // base AST node
 struct ASTNode {
     virtual ~ASTNode() = default;
     bool isPure = true;            // true if node has no effects
+    llvm::Value *llvmValue = nullptr;  // LLVM value generated during codegen
     std::string type = "Unknown";  // basic type inference: Int, String, Bool
 };
 
@@ -18,7 +21,6 @@ struct Literal : ASTNode {
 
     std::string value;
     std::string semType;
-    llvm::Value *llvmValue = nullptr;  // LLVM value generated during codegen
 
     Literal(Type t, const std::string &v) : type(t), value(v) {}
 };

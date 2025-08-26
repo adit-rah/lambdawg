@@ -41,14 +41,26 @@ void CodeGen::visitLiteral(const std::shared_ptr<Literal>& lit) {
     }
 }
 
+llvm::StructType* CodeGen::getVectorType() {
+    if (!vectorType) {
+        vectorType = llvm::StructType::create(context, "lambdawg_vector");
+        std::vector<llvm::Type*> members = {
+            llvm::PointerType::getUnqual(builder.getInt32Ty()),  // int* data
+            builder.getInt32Ty(),                                // length
+            builder.getInt32Ty()                                 // capacity
+        };
+        vectorType->setBody(members, /*isPacked=*/false);
+    }
+    return vectorType;
+}
+
 llvm::Function* CodeGen::getOrDeclareConsolePrint() {
     llvm::Function* f = module->getFunction("lambdawg_console_print");
     if (!f) {
         llvm::FunctionType* ft = llvm::FunctionType::get(
-            llvm::Type::getVoidTy(context),       // return void
+            llvm::Type::getVoidTy(context),                    // return void
             {llvm::Type::getInt8Ty(context)->getPointerTo()},  // i8*
-            false
-        );
+            false);
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
                                    "lambdawg_console_print", module.get());
     }
@@ -58,11 +70,14 @@ llvm::Function* CodeGen::getOrDeclareConsolePrint() {
 llvm::Function* CodeGen::getOrDeclareMap() {
     llvm::Function* f = module->getFunction("lambdawg_map");
     if (!f) {
-        // map(std::vector<int>*, int(*)(int))
-        llvm::Type* vecType = llvm::PointerType::getUnqual(builder.getInt32Ty()); // simplified
-        llvm::Type* fnType = llvm::PointerType::getUnqual(builder.getInt32Ty()); // placeholder for function pointer
-        llvm::FunctionType* ft = llvm::FunctionType::get(
-            vecType, {vecType, fnType}, false);
+        llvm::Type* vecPtrType = llvm::PointerType::getUnqual(getVectorType());
+        llvm::Type* fnType = llvm::PointerType::getUnqual(
+            builder.getInt32Ty());  // placeholder for int(*)(int)
+
+        llvm::FunctionType* ft =
+            llvm::FunctionType::get(vecPtrType,  // returns vector pointer
+                                    {vecPtrType, fnType}, false);
+
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
                                    "lambdawg_map", module.get());
     }
@@ -72,11 +87,13 @@ llvm::Function* CodeGen::getOrDeclareMap() {
 llvm::Function* CodeGen::getOrDeclareFilter() {
     llvm::Function* f = module->getFunction("lambdawg_filter");
     if (!f) {
-        // filter(std::vector<int>*, bool(*)(int))
-        llvm::Type* vecType = llvm::PointerType::getUnqual(builder.getInt32Ty());
-        llvm::Type* fnType = llvm::PointerType::getUnqual(builder.getInt1Ty()); // bool(*)(int)
-        llvm::FunctionType* ft = llvm::FunctionType::get(
-            vecType, {vecType, fnType}, false);
+        llvm::Type* vecPtrType = llvm::PointerType::getUnqual(getVectorType());
+        llvm::Type* fnType =
+            llvm::PointerType::getUnqual(builder.getInt1Ty());  // bool(*)(int)
+
+        llvm::FunctionType* ft =
+            llvm::FunctionType::get(vecPtrType, {vecPtrType, fnType}, false);
+
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
                                    "lambdawg_filter", module.get());
     }
@@ -112,20 +129,32 @@ void CodeGen::visitCall(const std::shared_ptr<Call>& call) {
     auto id = std::dynamic_pointer_cast<Identifier>(call->callee);
     if (!id) return;
 
-    auto it = functionTable.find(id->name);
-    if (it == functionTable.end()) return;
+    llvm::Function* calleeFunc = nullptr;
+    if (id->name == "map") {
+        calleeFunc = getOrDeclareMap();
+    } else if (id->name == "filter") {
+        calleeFunc = getOrDeclareFilter();
+    } else {
+        auto it = functionTable.find(id->name);
+        if (it != functionTable.end()) calleeFunc = it->second;
+    }
+    if (!calleeFunc) return;
 
-    llvm::Function* calleeFunc = it->second;
     std::vector<llvm::Value*> args;
 
     for (auto& arg : call->args) {
-        if (auto lit = std::dynamic_pointer_cast<Literal>(arg))
-            args.push_back(lit->llvmValue);
-        else
+        if (auto lit = std::dynamic_pointer_cast<Literal>(arg)) {
+            if (lit->semType == "Int") args.push_back(lit->llvmValue);
+            else if (lit->semType == "String") args.push_back(lit->llvmValue);
+        } else if (auto vec = std::dynamic_pointer_cast<Identifier>(arg)) {
+            // Assume identifier refers to a vector variable
+            args.push_back(vec->llvmValue);  // llvmValue points to LLVMVector*
+        } else {
             args.push_back(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
+        }
     }
 
-    // Add ambient arguments
+    // Add ambient lambdas
     args.insert(args.end(), currentAmbient.begin(), currentAmbient.end());
 
     builder.CreateCall(calleeFunc, args);
@@ -138,7 +167,8 @@ void CodeGen::visitPipeline(const std::shared_ptr<Pipeline>& pipe) {
         if (stage->isPure) {
             threads.emplace_back([this, stage]() {
                 if (auto call = std::dynamic_pointer_cast<Call>(stage)) {
-                    auto id = std::dynamic_pointer_cast<Identifier>(call->callee);
+                    auto id =
+                        std::dynamic_pointer_cast<Identifier>(call->callee);
                     if (!id) return;
 
                     if (id->name == "map") {
@@ -159,13 +189,12 @@ void CodeGen::visitPipeline(const std::shared_ptr<Pipeline>& pipe) {
                 }
             });
         } else {
-            visit(stage); // effectful sequential
+            visit(stage);  // effectful sequential
         }
     }
 
     for (auto& t : threads) t.join();
 }
-
 
 void CodeGen::visitEffectBlock(const std::shared_ptr<EffectBlock>& block) {
     for (auto& stmt : block->statements) {

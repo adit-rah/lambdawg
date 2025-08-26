@@ -23,6 +23,7 @@ class CodeGen {
     std::unique_ptr<llvm::Module> module;
 
     std::unordered_map<std::string, llvm::Function*> functionTable;
+    llvm::StructType* vectorType = nullptr;
     std::vector<llvm::Value*>
         currentAmbient;  // hidden args for ambient lambdas
 
@@ -33,6 +34,7 @@ class CodeGen {
     void visitPipeline(const std::shared_ptr<Pipeline>& pipe);
     void visitEffectBlock(const std::shared_ptr<EffectBlock>& block);
 
+    llvm::StructType* getVectorType(); 
     llvm::Function* getOrDeclareConsolePrint();
     llvm::Function* getOrDeclareMap();
     llvm::Function* getOrDeclareFilter();
