@@ -65,11 +65,11 @@ void SemanticChecker::visit(const std::shared_ptr<ASTNode>& node, Env& env) {
         block->isPure = !block->isEffect && pure;
     } else if (auto lit = std::dynamic_pointer_cast<Literal>(node)) {
         lit->isPure = true;
-        if (lit->type == Literal::Type::Int)
+        if (lit->litType == Literal::LitType::Int)
             lit->semType = "Int";
-        else if (lit->type == Literal::Type::String)
+        else if (lit->litType == Literal::LitType::String)
             lit->semType = "String";
-        else if (lit->type == Literal::Type::Bool)
+        else if (lit->litType == Literal::LitType::Bool)
             lit->semType = "Bool";
     } else if (auto id = std::dynamic_pointer_cast<Identifier>(node)) {
         if (!inScope(id->name, env)) {

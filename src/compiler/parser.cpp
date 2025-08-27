@@ -61,8 +61,8 @@ std::shared_ptr<ASTNode> Parser::parseExpression() {
     else if (current.type == TokenType::IntLiteral ||
              current.type == TokenType::StringLiteral) {
         expr = std::make_shared<Literal>(
-            current.type == TokenType::IntLiteral ? Literal::Type::Int
-                                                  : Literal::Type::String,
+            current.type == TokenType::IntLiteral ? Literal::LitType::Int
+                                                  : Literal::LitType::String,
             current.value);
         advance();
     }

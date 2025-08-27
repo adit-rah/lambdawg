@@ -23,9 +23,9 @@ class CodeGen {
     std::unique_ptr<llvm::Module> module;
 
     std::unordered_map<std::string, llvm::Function*> functionTable;
+    std::unordered_map<std::string, llvm::Value*> namedValues;
     llvm::StructType* vectorType = nullptr;
-    std::vector<llvm::Value*>
-        currentAmbient;  // hidden args for ambient lambdas
+    std::vector<llvm::Value*> currentAmbient;  // hidden args for ambient lambdas
 
     void visit(const std::shared_ptr<ASTNode>& node);
     void visitLiteral(const std::shared_ptr<Literal>& lit);
@@ -34,11 +34,11 @@ class CodeGen {
     void visitPipeline(const std::shared_ptr<Pipeline>& pipe);
     void visitEffectBlock(const std::shared_ptr<EffectBlock>& block);
 
-    llvm::StructType* getVectorType(); 
-    llvm::Function* getOrDeclareConsolePrint();
+    llvm::StructType* getVectorType();
+    llvm::Function* getOrDeclareConsolePrintStr();
+    llvm::Function* getOrDeclareConsolePrintVec();
     llvm::Function* getOrDeclareMap();
     llvm::Function* getOrDeclareFilter();
-
 };
 
 }  // namespace lambdawg
