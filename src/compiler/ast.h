@@ -17,12 +17,12 @@ struct ASTNode {
 
 // literal node
 struct Literal : ASTNode {
-    enum class Type { Int, String, Bool } type;
+    enum class LitType { Int, String, Bool } litType;
 
     std::string value;
     std::string semType;
 
-    Literal(Type t, const std::string &v) : type(t), value(v) {}
+    Literal(LitType t, const std::string &v) : litType(t), value(v) {}
 };
 
 // identifier
