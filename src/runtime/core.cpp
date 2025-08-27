@@ -1,8 +1,9 @@
 #include "core.h"
-#include <iostream>
-#include <cstdlib> // for new
 
-LLVMVector* lambdawg_map(LLVMVector* vec, int (*fn)(int)) {
+#include <cstdlib>
+#include <iostream>
+
+LLVMVector* lambdawg_runtime_map(LLVMVector* vec, int (*fn)(int)) {
     LLVMVector* result = new LLVMVector;
     result->length = vec->length;
     result->capacity = vec->length;
@@ -15,7 +16,7 @@ LLVMVector* lambdawg_map(LLVMVector* vec, int (*fn)(int)) {
     return result;
 }
 
-LLVMVector* lambdawg_filter(LLVMVector* vec, bool (*pred)(int)) {
+LLVMVector* lambdawg_runtime_filter(LLVMVector* vec, bool (*pred)(int)) {
     int count = 0;
     for (int i = 0; i < vec->length; ++i)
         if (pred(vec->data[i])) count++;
@@ -32,9 +33,15 @@ LLVMVector* lambdawg_filter(LLVMVector* vec, bool (*pred)(int)) {
     return result;
 }
 
-void lambdawg_console_print(LLVMVector* vec) {
+void lambdawg_runtime_console_print_vec(LLVMVector* vec) {
     for (int i = 0; i < vec->length; ++i) {
         std::cout << vec->data[i] << " ";
     }
     std::cout << std::endl;
+}
+
+void lambdawg_runtime_console_print_str(const char* str) {
+    if (str) {
+        std::cout << str << std::endl;
+    }
 }
