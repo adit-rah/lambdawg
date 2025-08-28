@@ -10,9 +10,10 @@ namespace lambdawg {
 
 class SemanticChecker {
 public:
-    void check(const std::shared_ptr<ASTNode>& node);
+    bool check(const std::shared_ptr<ASTNode>& node);
 
 private:
+    int errorCount = 0;
     struct Env {
         std::unordered_map<std::string, std::string> vars; // var -> type
         std::unordered_map<std::string, std::string> ambient; // ambient lambdas
