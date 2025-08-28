@@ -29,6 +29,7 @@ class CodeGen {
 
     void visit(const std::shared_ptr<ASTNode>& node);
     void visitLiteral(const std::shared_ptr<Literal>& lit);
+    void visitIdentifierNode(const std::shared_ptr<Identifier>& id);
     void visitFunction(const std::shared_ptr<FunctionDecl>& fn);
     void visitCall(const std::shared_ptr<Call>& call);
     void visitPipeline(const std::shared_ptr<Pipeline>& pipe);

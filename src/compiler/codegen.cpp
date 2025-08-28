@@ -46,6 +46,25 @@ void CodeGen::visitLiteral(const std::shared_ptr<Literal>& lit) {
     }
 }
 
+void CodeGen::visitIdentifierNode(const std::shared_ptr<Identifier>& id) {
+    auto it = namedValues.find(id->name);
+    if (it != namedValues.end()) {
+        llvm::Value* ptr = it->second;
+        if (auto* alloca = llvm::dyn_cast<llvm::AllocaInst>(ptr)) {
+            llvm::Type* elemTy = alloca->getAllocatedType();
+            id->llvmValue = builder.CreateLoad(elemTy, ptr);
+        } else {
+            id->llvmValue = ptr; // not an alloca, just a value
+        }
+    } else {
+        auto fit = functionTable.find(id->name);
+        if (fit != functionTable.end())
+            id->llvmValue = fit->second;
+        else
+            id->llvmValue = nullptr;
+    }
+}
+
 void CodeGen::visitFunction(const std::shared_ptr<FunctionDecl>& fn) {
     std::vector<llvm::Type*> argTypes(fn->params.size(),
                                       llvm::Type::getInt32Ty(context));
@@ -57,15 +76,23 @@ void CodeGen::visitFunction(const std::shared_ptr<FunctionDecl>& fn) {
 
     functionTable[fn->name->name] = function;
 
-    auto block = llvm::BasicBlock::Create(context, "entry", function);
-    builder.SetInsertPoint(block);
+    auto entryBB = llvm::BasicBlock::Create(context, "entry", function);
+    builder.SetInsertPoint(entryBB);
 
-    // Bind params into namedValues
+    namedValues.clear();
     size_t idx = 0;
     for (auto& arg : function->args()) {
-        namedValues[fn->params[idx++]->name] = &arg;
+        // create an alloca in entry block to hold the parameter
+        llvm::AllocaInst* alloca =
+            builder.CreateAlloca(arg.getType(), nullptr, fn->params[idx]->name);
+        // store the incoming argument into the alloca
+        builder.CreateStore(&arg, alloca);
+        // record pointer to alloca (so later loads can occur)
+        namedValues[fn->params[idx]->name] = alloca;
+        ++idx;
     }
 
+    // now generate body
     visit(fn->body);
 
     if (fn->body->llvmValue)
@@ -79,43 +106,60 @@ void CodeGen::visitCall(const std::shared_ptr<Call>& call) {
     auto calleeId = std::dynamic_pointer_cast<Identifier>(call->callee);
     if (!calleeId) {
         std::cerr << "Non-identifier callee not supported yet\n";
+        call->llvmValue = nullptr;
         return;
     }
 
+    // Evaluate args first
     std::vector<llvm::Value*> argVals;
+    argVals.reserve(call->args.size());
     for (auto& arg : call->args) {
         visit(arg);
-        argVals.push_back(arg->llvmValue);
-    }
-
-    if (calleeId->name == "print") {
-        if (call->args.size() == 1 && call->args[0]->type == "String") {
-            auto fn = getOrDeclareConsolePrintStr();
-            builder.CreateCall(fn, argVals);
+        if (!arg->llvmValue) {
+            std::cerr << "Warning: argument produced no llvmValue\n";
+            // push a safe default to avoid crashes
+            argVals.push_back(
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0));
         } else {
-            auto fn = getOrDeclareConsolePrintVec();
-            builder.CreateCall(fn, argVals);
+            argVals.push_back(arg->llvmValue);
         }
+    }
+
+    // Built-in console.print (support either "console.print" or "print")
+    if (calleeId->name == "console.print" || calleeId->name == "print") {
+        if (!argVals.empty()) {
+            // choose string or vector overload by argument type
+            if (call->args[0]->type == "String") {
+                auto* fn = getOrDeclareConsolePrintStr();
+                builder.CreateCall(fn, {argVals[0]});
+            } else {
+                auto* fn = getOrDeclareConsolePrintVec();
+                builder.CreateCall(fn, {argVals[0]});
+            }
+        }
+        call->llvmValue = nullptr;  // printing returns no value
         return;
     }
 
+    // map/filter
     if (calleeId->name == "map") {
-        auto fn = getOrDeclareMap();
+        auto* fn = getOrDeclareMap();
         call->llvmValue = builder.CreateCall(fn, argVals);
         return;
     }
-
     if (calleeId->name == "filter") {
-        auto fn = getOrDeclareFilter();
+        auto* fn = getOrDeclareFilter();
         call->llvmValue = builder.CreateCall(fn, argVals);
         return;
     }
 
+    // user function
     auto it = functionTable.find(calleeId->name);
     if (it != functionTable.end()) {
         call->llvmValue = builder.CreateCall(it->second, argVals);
     } else {
         std::cerr << "Unknown function: " << calleeId->name << "\n";
+        call->llvmValue = nullptr;
     }
 }
 
@@ -137,51 +181,72 @@ void CodeGen::visitEffectBlock(const std::shared_ptr<EffectBlock>& block) {
 // declarations for runtime functions
 
 llvm::Function* CodeGen::getOrDeclareConsolePrintStr() {
-    if (auto* f = module->getFunction("console_print_str")) return f;
+    if (auto* f = module->getFunction("lambdawg_runtime_console_print_str"))
+        return f;
 
-    // Use builder to get types safely
     auto* fnType = llvm::FunctionType::get(
-        builder.getVoidTy(),                    // return type: void
-        {llvm::PointerType::getUnqual(
-            llvm::Type::getInt8Ty(context))},  // parameter: i8*
-        false                                  // not variadic
-    );
+        llvm::Type::getVoidTy(context),
+        {llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(context))},  // i8*
+        false);
 
     return llvm::Function::Create(fnType, llvm::Function::ExternalLinkage,
-                                  "console_print_str", module.get());
+                                  "lambdawg_runtime_console_print_str",
+                                  module.get());
 }
 
 llvm::Function* CodeGen::getOrDeclareConsolePrintVec() {
-    if (auto* f = module->getFunction("console_print_vec")) return f;
+    if (auto* f = module->getFunction("lambdawg_runtime_console_print_vec"))
+        return f;
+
+    auto* vecPtrTy = llvm::PointerType::getUnqual(getVectorType());
     auto* fnType = llvm::FunctionType::get(llvm::Type::getVoidTy(context),
-                                           {getVectorType()}, false);
+                                           {vecPtrTy}, false);
     return llvm::Function::Create(fnType, llvm::Function::ExternalLinkage,
-                                  "console_print_vec", module.get());
+                                  "lambdawg_runtime_console_print_vec",
+                                  module.get());
 }
 
 llvm::Function* CodeGen::getOrDeclareMap() {
-    if (auto* f = module->getFunction("runtime_map")) return f;
+    if (auto* f = module->getFunction("lambdawg_runtime_map")) return f;
+
+    auto* vecPtrTy = llvm::PointerType::getUnqual(getVectorType());
+    auto* intTy = llvm::Type::getInt32Ty(context);
+
+    // int (int)  -> function pointer type
+    auto* mapperTy = llvm::FunctionType::get(intTy, {intTy}, false);
+    auto* mapperPtrTy = llvm::PointerType::getUnqual(mapperTy);
+
     auto* fnType =
-        llvm::FunctionType::get(getVectorType(), {getVectorType()}, false);
+        llvm::FunctionType::get(vecPtrTy, {vecPtrTy, mapperPtrTy}, false);
     return llvm::Function::Create(fnType, llvm::Function::ExternalLinkage,
-                                  "runtime_map", module.get());
+                                  "lambdawg_runtime_map", module.get());
 }
 
 llvm::Function* CodeGen::getOrDeclareFilter() {
-    if (auto* f = module->getFunction("runtime_filter")) return f;
+    if (auto* f = module->getFunction("lambdawg_runtime_filter")) return f;
+
+    auto* vecPtrTy = llvm::PointerType::getUnqual(getVectorType());
+    auto* intTy = llvm::Type::getInt32Ty(context);
+    auto* boolTy = llvm::Type::getInt1Ty(context);
+
+    // i1 (i32) -> predicate pointer type
+    auto* predTy = llvm::FunctionType::get(boolTy, {intTy}, false);
+    auto* predPtrTy = llvm::PointerType::getUnqual(predTy);
+
     auto* fnType =
-        llvm::FunctionType::get(getVectorType(), {getVectorType()}, false);
+        llvm::FunctionType::get(vecPtrTy, {vecPtrTy, predPtrTy}, false);
     return llvm::Function::Create(fnType, llvm::Function::ExternalLinkage,
-                                  "runtime_filter", module.get());
+                                  "lambdawg_runtime_filter", module.get());
 }
 
 llvm::StructType* CodeGen::getVectorType() {
     if (!vectorType) {
-        vectorType = llvm::StructType::create(context, "Vector");
+        vectorType = llvm::StructType::create(context, "LLVMVector");
         vectorType->setBody({
-            llvm::Type::getInt32Ty(context),  // length
             llvm::PointerType::getUnqual(
-                llvm::Type::getInt8Ty(context))  // data ptr
+                llvm::Type::getInt32Ty(context)),  // int*
+            llvm::Type::getInt32Ty(context),       // length
+            llvm::Type::getInt32Ty(context)        // capacity
         });
     }
     return vectorType;
