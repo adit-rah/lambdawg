@@ -28,6 +28,7 @@ struct Literal : ASTNode {
 // identifier
 struct Identifier : ASTNode {
     std::string name;
+    Identifier() = default;
     Identifier(const std::string &n) : name(n) {}
 };
 
@@ -51,7 +52,7 @@ struct Pipeline : ASTNode {
 };
 
 struct EffectBlock : ASTNode {
-    bool isEffect;  // true if do!
+    bool isEffect = false;  // true if do!
     std::vector<std::shared_ptr<ASTNode>> statements;
 };
 
