@@ -46,18 +46,25 @@ npm test
 
 ### Using the Compiler
 
-#### 1. Interactive Browser Sandbox
+#### 1. Web Playground (Recommended!)
 
-The easiest way to try Lambdawg:
+The easiest way to try Lambdawg - a full-featured web IDE with Monaco Editor:
 
 ```bash
-# Start a local server
-npx http-server . -p 8080
+cd playground
+npm install
+npm run dev
 
-# Open http://localhost:8080/examples/sandbox.html
+# Open http://localhost:3000
 ```
 
-The sandbox provides a live editor where you can write Lambdawg code, see the compiled JavaScript, and run it instantly!
+Features:
+- 🎨 Syntax highlighting
+- ⚡ Live error checking
+- 🔄 Instant compilation and execution
+- 📦 Multiple example programs
+- 🔗 Share code via URL
+- 📊 View JavaScript output and AST
 
 #### 2. Node.js Examples
 
