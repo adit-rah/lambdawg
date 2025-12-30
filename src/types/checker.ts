@@ -201,6 +201,38 @@ export class TypeChecker {
       )
     ));
 
+    // Result type constructors
+    // Ok: (a) -> Result a e
+    const a10 = freshTypeVar();
+    const e10 = freshTypeVar();
+    env.define('Ok', createScheme(
+      [a10.id, e10.id],
+      createFuncType([a10], createTypeApp('Result', [a10, e10]))
+    ));
+
+    // Error: (e) -> Result a e
+    const a11 = freshTypeVar();
+    const e11 = freshTypeVar();
+    env.define('Error', createScheme(
+      [a11.id, e11.id],
+      createFuncType([e11], createTypeApp('Result', [a11, e11]))
+    ));
+
+    // Option type constructors
+    // Some: (a) -> Option a
+    const a12 = freshTypeVar();
+    env.define('Some', createScheme(
+      [a12.id],
+      createFuncType([a12], createTypeApp('Option', [a12]))
+    ));
+
+    // None: Option a
+    const a13 = freshTypeVar();
+    env.define('None', createScheme(
+      [a13.id],
+      createTypeApp('Option', [a13])
+    ));
+
     return env;
   }
 

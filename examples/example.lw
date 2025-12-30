@@ -1,0 +1,66 @@
+-- Example Lambdawg Program
+-- This shows off various language features
+
+-- Simple values
+let x = 42
+let name = "Lambdawg"
+let active = true
+
+-- Functions
+let add = (a, b) => a + b
+let multiply = (a, b) => a * b
+
+-- Higher-order functions
+let twice = (f, x) => f(f(x))
+let increment = (n) => n + 1
+
+-- Pipelines
+let nums = [1, 2, 3, 4, 5]
+let processed = nums 
+  |> map((x) => x * 2, _)
+  |> filter((x) => x > 5, _)
+  |> sum(_)
+
+-- Pattern matching
+let describe = (n) => match n {
+  0 => "zero"
+  1 => "one"
+  2 => "two"
+  _ => "many"
+}
+
+-- Records
+let point = { x: 10, y: 20 }
+let point3d = { ...point, z: 30 }
+
+-- Record destructuring
+let getX = ({ x }) => x
+let distance = ({ x, y }) => x * x + y * y
+
+-- Partial application
+let add10 = add(10, _)
+let double = multiply(2, _)
+
+-- Conditional expressions
+let sign = (n) => 
+  if n > 0 then "positive"
+  else if n < 0 then "negative"
+  else "zero"
+
+-- Result types for error handling
+let safeDivide = (a, b) =>
+  if b == 0 then Error("division by zero")
+  else Ok(a / b)
+
+-- List operations
+let squares = [1, 2, 3, 4] |> map((x) => x * x, _)
+let evens = [1, 2, 3, 4, 5, 6] |> filter((x) => x % 2 == 0, _)
+
+-- Module definition
+module utils {
+  let isEven = (n) => n % 2 == 0
+  let isOdd = (n) => n % 2 != 0
+  let abs = (n) => if n < 0 then -n else n
+}
+
+

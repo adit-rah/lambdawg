@@ -1,0 +1,20 @@
+-- Example demonstrating Result and Option types
+
+-- Safe division that returns Result
+let safeDivide = (a, b) =>
+  if b == 0 then Error("division by zero")
+  else Ok(a / b)
+
+-- Using Option for nullable values
+let findFirst = (list) =>
+  if length(list) > 0 then Some(list[0])
+  else None
+
+-- Test the functions
+let divResult1 = safeDivide(10, 2)
+let divResult2 = safeDivide(10, 0)
+
+let numbers = [1, 2, 3]
+let firstNum = findFirst(numbers)
+let emptyFirst = findFirst([])
+

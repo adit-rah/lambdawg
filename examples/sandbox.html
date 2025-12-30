@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lambdawg Sandbox</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    header {
+      background: #2d3748;
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #cbd5e0;
+      font-size: 1rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      min-height: 600px;
+    }
+
+    .panel {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-left {
+      border-right: 2px solid #e2e8f0;
+    }
+
+    .panel-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    textarea {
+      flex: 1;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 14px;
+      padding: 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: #667eea;
+    }
+
+    .output {
+      flex: 1;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.875rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      flex: 1;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #2d3748;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .error {
+      color: #fc8181;
+    }
+
+    .success {
+      color: #68d391;
+    }
+
+    .info {
+      color: #63b3ed;
+    }
+
+    .separator {
+      color: #4a5568;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-left {
+        border-right: none;
+        border-bottom: 2px solid #e2e8f0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🐕 Lambdawg Sandbox</h1>
+      <p class="subtitle">Experimental functional programming with clarity, parallelism, and honest effects</p>
+    </header>
+
+    <div class="layout">
+      <div class="panel panel-left">
+        <div class="panel-title">Lambdawg Code</div>
+        <textarea id="input" spellcheck="false">let add = (a, b) => a + b
+let mul = (a, b) => a * b
+
+let nums = [1, 2, 3, 4, 5]
+let doubled = nums |> map((x) => x * 2, _)
+let total = doubled |> sum(_)
+
+let describe = (n) => match n {
+  0 => "zero"
+  1 => "one"
+  _ => "many"
+}
+
+let point = { x: 10, y: 20 }
+let moved = { ...point, x: 15 }</textarea>
+        <div class="controls">
+          <button class="btn-primary" onclick="compileCode()">▶ Compile & Run</button>
+          <button class="btn-secondary" onclick="clearOutput()">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Output</div>
+        <div id="output" class="output">Click "Compile & Run" to see the compiled JavaScript and execution results.</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { compile, formatCompilerErrors } from '../dist/index.js';
+
+    window.compileCode = function() {
+      const input = document.getElementById('input').value;
+      const output = document.getElementById('output');
+      
+      output.innerHTML = '<span class="info">⚙ Compiling...</span>\n';
+
+      try {
+        const result = compile(input, { 
+          filename: 'sandbox.lw',
+          emit: { runtime: 'browser' }
+        });
+
+        if (result.success) {
+          output.innerHTML = '<span class="success">✓ Compilation successful!</span>\n\n';
+          output.innerHTML += '<span class="separator">═══ Generated JavaScript ═══</span>\n\n';
+          output.innerHTML += escapeHtml(result.code) + '\n\n';
+          output.innerHTML += '<span class="separator">═══ Execution Result ═══</span>\n\n';
+
+          // Capture console.log
+          const logs = [];
+          const originalLog = console.log;
+          console.log = (...args) => {
+            logs.push(args.map(arg => 
+              typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' '));
+          };
+
+          try {
+            // Execute the compiled code
+            eval(result.code);
+            
+            if (logs.length > 0) {
+              output.innerHTML += logs.join('\n') + '\n';
+            } else {
+              output.innerHTML += '<span class="info">Code executed successfully (no console output)</span>\n';
+            }
+
+            // Show some defined values if they exist
+            const variables = ['x', 'y', 'nums', 'doubled', 'total', 'add', 'describe', 'point', 'moved'];
+            const defined = [];
+            
+            for (const varName of variables) {
+              try {
+                const value = eval(varName);
+                if (value !== undefined) {
+                  defined.push(`${varName} = ${JSON.stringify(value)}`);
+                }
+              } catch (e) {
+                // Variable doesn't exist
+              }
+            }
+
+            if (defined.length > 0) {
+              output.innerHTML += '\n<span class="info">Defined variables:</span>\n';
+              output.innerHTML += defined.join('\n');
+            }
+
+          } catch (error) {
+            output.innerHTML += '<span class="error">✗ Runtime error: ' + escapeHtml(error.message) + '</span>\n';
+            output.innerHTML += escapeHtml(error.stack);
+          } finally {
+            console.log = originalLog;
+          }
+
+        } else {
+          output.innerHTML = '<span class="error">✗ Compilation failed:</span>\n\n';
+          output.innerHTML += escapeHtml(formatCompilerErrors(result.errors));
+        }
+
+      } catch (error) {
+        output.innerHTML = '<span class="error">✗ Unexpected error:</span>\n\n';
+        output.innerHTML += escapeHtml(error.message) + '\n' + escapeHtml(error.stack);
+      }
+    };
+
+    window.clearOutput = function() {
+      document.getElementById('output').innerHTML = 'Output cleared.';
+    };
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
+
+
